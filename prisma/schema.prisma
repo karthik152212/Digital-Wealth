@@ -1,0 +1,386 @@
+// Digital Wealth Vault — Prisma schema
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum AssetCategory {
+  CRYPTO
+  DOMAIN
+  CLOUD_STORAGE
+  INVESTMENT
+  GAMING
+  DIGITAL_CONTENT
+  SOCIAL_MEDIA
+  PAYMENT_ACCOUNT
+  SOFTWARE_LICENSE
+  OTHER
+}
+
+enum AssetStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum TransferPolicy {
+  ALLOWED
+  RESTRICTED
+  PROHIBITED
+  UNVERIFIED
+}
+
+enum LinkType {
+  OFFICIAL_SITE
+  SELLING_POLICY
+  TRANSFER_POLICY
+  SUPPORT
+  HELP_CENTER
+  RECOVERY
+}
+
+enum InheritanceStatus {
+  INVITED
+  ELIGIBLE
+  CLAIMED_PENDING_CONFIRM
+  RELEASED
+  REVOKED
+  DECLINED
+  EXPIRED
+}
+
+enum InheritanceAction {
+  INVITED
+  REMINDER_SENT
+  ELIGIBILITY_MET
+  CLAIM_STARTED
+  IDENTITY_RECONFIRMED
+  RELEASED
+  REVOKED
+  DECLINED
+  EXPIRED
+}
+
+enum AuthAccessStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum NomineeStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum NotificationType {
+  INACTIVITY_WARNING
+  GRACE_NOTICE
+  NOMINEE_INVITE
+  ACCESS_RELEASED
+  AUTHORIZATION_CHANGED
+}
+
+// ---------------------------------------------------------------------------
+// Authentication (Better Auth)
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  isDemo        Boolean   @default(false)
+  lastSeenAt    DateTime?
+
+  sessions          Session[]
+  accounts          Account[]
+  assets            Asset[]
+  nominees          Nominee[]
+  authorizations    AssetAuthorization[]   @relation("AuthorizationGrantedBy")
+  inheritanceInvites InheritanceRequest[]  @relation("InheritanceInvitedBy")
+  valuations        Valuation[]            @relation("ValuationRecordedBy")
+  notifications     Notification[]
+  inheritanceEvents InheritanceEvent[]     @relation("InheritanceEventActor")
+
+  @@index([isDemo])
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Account {
+  id                   String    @id
+  accountId            String
+  providerId           String
+  userId               String
+  accessToken          String?
+  refreshToken         String?
+  idToken              String?
+  accessTokenExpiresAt DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                String?
+  password             String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// Shared, multi-instance rate-limit store used by Better Auth's
+// `rateLimit: { storage: "database" }` and by the verification-resend
+// cooldown (key = "verification-resend:<email>"). Never process-local.
+model RateLimit {
+  id          String  @id @default(cuid())
+  key         String  @unique
+  count       Int     @default(0)
+  lastRequest BigInt
+
+  @@index([lastRequest])
+}
+
+// ---------------------------------------------------------------------------
+// Providers & official guidance
+// ---------------------------------------------------------------------------
+
+model Provider {
+  id             String         @id
+  name           String         @unique
+  websiteUrl     String
+  supportUrl     String?
+  policyUrl      String?
+  transferPolicy TransferPolicy @default(UNVERIFIED)
+  policyNotes    String?
+  isDemo         Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  assets Asset[]
+
+  @@index([name])
+}
+
+// ---------------------------------------------------------------------------
+// Assets & valuation
+// ---------------------------------------------------------------------------
+
+model Asset {
+  id                String       @id
+  ownerId           String
+  title             String
+  description       String?
+  category          AssetCategory
+  status            AssetStatus  @default(ACTIVE)
+  providerName      String
+  providerId        String?
+  accountReference  String?
+  estimatedValue    Decimal      @default(0) @db.Decimal(12, 2)
+  currency          String       @default("INR")
+  valuationBasis    String?
+  valuationDate     DateTime     @default(now())
+  ownershipEvidence String?
+  recoveryInstructions String?
+  nomineeCanSeeAccountReference Boolean @default(false)
+  resaleEligible    Boolean      @default(false)
+  resaleNotes       String?
+  isDemo            Boolean      @default(false)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  owner           User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  provider        Provider?          @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  valuations      Valuation[]
+  sellingSteps    SellingStep[]
+  officialLinks   OfficialLink[]
+  authorizations  AssetAuthorization[]
+  inheritanceRequests InheritanceRequest[]
+
+  @@index([ownerId, status])
+  @@index([category])
+  @@index([providerId])
+}
+
+model Valuation {
+  id         String   @id
+  assetId    String
+  value      Decimal  @db.Decimal(12, 2)
+  currency   String   @default("INR")
+  basis      String?
+  valuedAt   DateTime
+  recordedBy String
+  isDemo     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  asset      Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  recordedByUser User @relation("ValuationRecordedBy", fields: [recordedBy], references: [id], onDelete: Cascade)
+
+  @@index([assetId, valuedAt])
+}
+
+model SellingStep {
+  id          String  @id
+  assetId     String
+  position    Int
+  title       String
+  body        String
+  officialUrl String?
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId, position])
+}
+
+model OfficialLink {
+  id      String   @id
+  assetId String
+  label   String
+  url     String
+  type    LinkType
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+}
+
+// ---------------------------------------------------------------------------
+// Nominees & authorization
+// ---------------------------------------------------------------------------
+
+model Nominee {
+  id           String       @id
+  ownerId      String
+  name         String
+  email        String
+  relationship String?
+  status       NomineeStatus @default(ACTIVE)
+  revokedAt    DateTime?
+  isDemo       Boolean      @default(false)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  owner               User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  authorizations      AssetAuthorization[]
+  inheritanceRequests InheritanceRequest[]
+
+  @@unique([ownerId, email])
+  @@index([ownerId])
+  @@index([ownerId, status])
+}
+
+model AssetAuthorization {
+  id        String            @id
+  assetId   String
+  nomineeId String
+  grantedBy String
+  attempt   Int               @default(1)
+  status    AuthAccessStatus  @default(ACTIVE)
+  grantedAt DateTime          @default(now())
+  revokedAt DateTime?
+  isDemo    Boolean           @default(false)
+
+  asset   Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  nominee Nominee @relation(fields: [nomineeId], references: [id], onDelete: Cascade)
+  grantedByUser User @relation("AuthorizationGrantedBy", fields: [grantedBy], references: [id], onDelete: Cascade)
+
+  @@index([nomineeId, status])
+}
+
+// ---------------------------------------------------------------------------
+// Inheritance workflow (simulated)
+// ---------------------------------------------------------------------------
+
+model InheritanceRequest {
+  id            String             @id
+  assetId       String
+  nomineeId     String
+  invitedById   String
+  attempt       Int                @default(1)
+  status        InheritanceStatus  @default(INVITED)
+  invitedAt     DateTime           @default(now())
+  graceEndsAt   DateTime
+  eligibleAt    DateTime?
+  claimedAt     DateTime?
+  releasedAt    DateTime?
+  lastRemindedAt DateTime?
+  declineReason String?
+  claimCodeHash String?
+  claimCodeAttempts Int            @default(0)
+  isDemo        Boolean            @default(false)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  asset   Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  nominee Nominee @relation(fields: [nomineeId], references: [id], onDelete: Cascade)
+  invitedByUser User @relation("InheritanceInvitedBy", fields: [invitedById], references: [id], onDelete: Cascade)
+  events  InheritanceEvent[]
+
+  @@unique([assetId, nomineeId, attempt])
+  @@index([status, graceEndsAt])
+  @@index([nomineeId, status])
+}
+
+model InheritanceEvent {
+  id        String            @id
+  requestId String
+  actorId   String?
+  action    InheritanceAction
+  note      String?
+  createdAt DateTime          @default(now())
+
+  request InheritanceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actor   User?              @relation("InheritanceEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([requestId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Notifications (in-app only; no email is ever sent)
+// ---------------------------------------------------------------------------
+
+model Notification {
+  id        String           @id
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  createdAt DateTime         @default(now())
+  readAt    DateTime?
+  isDemo    Boolean          @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
