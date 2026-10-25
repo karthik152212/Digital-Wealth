@@ -52,13 +52,25 @@ export function LoginForm({ googleEnabled }: { googleEnabled: boolean }) {
           setVerifyRequired(true);
           return;
         }
+        // 5xx responses mean the server failed (database, config, outage);
+        // show an honest, user-safe message instead of blaming credentials.
+        if ((res.error.status ?? 0) >= 500) {
+          setError(
+            "The server hit an unexpected error. Please try again in a moment.",
+          );
+          return;
+        }
         setError(res.error.message ?? "Invalid email or password.");
         return;
       }
       router.push("/dashboard");
       router.refresh();
     } catch {
-      setError("Something went wrong. Please try again.");
+      // The fetch itself threw (server unreachable/off, network drop, or an
+      // unparseable response) — say so instead of the generic message.
+      setError(
+        "Could not reach the authentication server. Check that it is running, then try again.",
+      );
     } finally {
       setLoading(false);
     }

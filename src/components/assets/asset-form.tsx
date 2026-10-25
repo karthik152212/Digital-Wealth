@@ -3,7 +3,21 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  AtSign,
+  Bitcoin,
+  Cloud,
+  CreditCard,
+  Gamepad2,
+  Globe,
+  Image as ImageIcon,
+  Key,
+  Loader2,
+  Package,
+  TrendingUp,
+  type LucideIcon,
+} from "lucide-react";
 
 import { ASSET_CATEGORIES, ASSET_STATUSES, CATEGORY_LABELS } from "@/lib/asset-schemas";
 import { SUPPORTED_CURRENCIES } from "@/lib/currency";
@@ -52,6 +66,89 @@ type ApiErrorResponse = {
   id?: string;
 };
 
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  CRYPTO: Bitcoin,
+  DOMAIN: Globe,
+  CLOUD_STORAGE: Cloud,
+  INVESTMENT: TrendingUp,
+  GAMING: Gamepad2,
+  DIGITAL_CONTENT: ImageIcon,
+  SOCIAL_MEDIA: AtSign,
+  PAYMENT_ACCOUNT: CreditCard,
+  SOFTWARE_LICENSE: Key,
+  OTHER: Package,
+};
+
+function CategoryPicker({
+  selected,
+  onSelect,
+  onCancel,
+}: {
+  selected: string;
+  onSelect: (category: string) => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <p className="font-heading text-lg font-semibold tracking-tight">
+          What kind of asset is this?
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Choosing a category shapes the details you&apos;ll enter next.
+        </p>
+      </div>
+
+      <div
+        role="radiogroup"
+        aria-label="Asset category"
+        className="grid gap-3 sm:grid-cols-2"
+      >
+        {ASSET_CATEGORIES.map((value) => {
+          const Icon = CATEGORY_ICONS[value] ?? Package;
+          const isSelected = selected === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={isSelected}
+              onClick={() => onSelect(value)}
+              className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card ${
+                isSelected
+                  ? "border-primary bg-secondary"
+                  : "bg-card hover:bg-accent/60"
+              }`}
+            >
+              <span
+                className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${
+                  isSelected
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-accent text-accent-foreground"
+                }`}
+              >
+                <Icon className="size-4" />
+              </span>
+              <span className="font-medium">
+                {CATEGORY_LABELS[value] ?? value}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex items-center justify-end gap-3">
+        <Button type="button" variant="ghost" asChild>
+          <Link href="/dashboard">Cancel</Link>
+        </Button>
+        <Button type="button" onClick={onCancel} disabled={!selected}>
+          Continue
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function FieldError({ id, message }: { id: string; message?: string }) {
   if (!message) return null;
   return (
@@ -65,6 +162,9 @@ export function AssetForm(props: AssetFormProps) {
   const router = useRouter();
   const initial = props.mode === "edit" ? props.initial : null;
 
+  const [step, setStep] = useState<"category" | "details">(
+    props.mode === "create" ? "category" : "details",
+  );
   const [title, setTitle] = useState(initial?.title ?? "");
   const [category, setCategory] = useState(initial?.category ?? "");
   const [providerName, setProviderName] = useState(initial?.providerName ?? "");
@@ -148,6 +248,37 @@ export function AssetForm(props: AssetFormProps) {
     }
   }
 
+  if (!isEdit && step === "category") {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Add asset</CardTitle>
+          <CardDescription>
+            Record a digital asset you own. Values are your own estimates.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <CategoryPicker
+            selected={category}
+            onSelect={(value) => {
+              setCategory(value);
+              setFieldErrors((prev) => {
+                const next = { ...prev };
+                delete next.category;
+                return next;
+              });
+            }}
+            onCancel={() => {
+              if (category) {
+                setStep("details");
+              }
+            }}
+          />
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -208,7 +339,8 @@ export function AssetForm(props: AssetFormProps) {
               />
             </div>
 
-            <div className="space-y-2">
+            {/* Category select for edit mode; create mode uses the picker */}
+            <div className={`${isEdit ? "space-y-2" : "hidden"} space-y-2`}>
               <Label htmlFor="asset-category">
                 Category <span aria-hidden="true">*</span>
               </Label>
@@ -460,6 +592,16 @@ export function AssetForm(props: AssetFormProps) {
           </div>
 
           <div className="flex items-center justify-end gap-3">
+            {!isEdit && (
+              <button
+                type="button"
+                onClick={() => setStep("category")}
+                className="mr-auto inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <ArrowLeft className="size-4" />
+                Change category
+              </button>
+            )}
             <Button type="button" variant="ghost" asChild>
               <Link href={isEdit ? `/dashboard/assets/${props.assetId}` : "/dashboard"}>
                 Cancel
@@ -479,3 +621,5 @@ export function AssetForm(props: AssetFormProps) {
     </Card>
   );
 }
+
+
