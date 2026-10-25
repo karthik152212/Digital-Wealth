@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   AtSign,
   Bitcoin,
+  Check,
   Cloud,
   CreditCard,
   Gamepad2,
@@ -79,69 +80,163 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
   OTHER: Package,
 };
 
+// Display-only, one-line guidance for each category.
+const CATEGORY_DESCRIPTIONS: Record<string, string> = {
+  CRYPTO: "Wallets, holdings and digital tokens",
+  INVESTMENT: "Brokerage accounts, shares and platforms",
+  DOMAIN: "Domains, hosting and websites",
+  GAMING: "Game accounts, libraries and in-game holdings",
+  DIGITAL_CONTENT: "NFTs and purchased digital collections",
+  CLOUD_STORAGE: "Cloud drives and document repositories",
+  SOFTWARE_LICENSE: "Software and licences you own",
+  OTHER: "Digital property that fits elsewhere",
+  SOCIAL_MEDIA: "Profiles and handles, for your nominee's reference",
+  PAYMENT_ACCOUNT: "Payment services, for your nominee's reference",
+};
+
+// The eight core inheritance categories shown prominently.
+const PRIMARY_CATEGORIES = [
+  "CRYPTO",
+  "INVESTMENT",
+  "DOMAIN",
+  "GAMING",
+  "DIGITAL_CONTENT",
+  "CLOUD_STORAGE",
+  "SOFTWARE_LICENSE",
+  "OTHER",
+] as const;
+
+// Accounts with provider-TOS limits on transfer: still recordable, but kept
+// separate from primary wealth categories so the picker stays honest.
+const REFERENCE_CATEGORIES = ["SOCIAL_MEDIA", "PAYMENT_ACCOUNT"] as const;
+
+function CategoryTile({
+  value,
+  selected,
+  onSelect,
+}: {
+  value: string;
+  selected: boolean;
+  onSelect: (category: string) => void;
+}) {
+  const Icon = CATEGORY_ICONS[value] ?? Package;
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      onClick={() => onSelect(value)}
+      className={`flex items-start gap-3 rounded-lg border px-4 py-3 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card ${
+        selected
+          ? "border-primary bg-secondary"
+          : "border-border bg-card hover:bg-accent/50"
+      }`}
+    >
+      <span
+        className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md ${
+          selected
+            ? "bg-primary text-primary-foreground"
+            : "bg-accent text-accent-foreground"
+        }`}
+      >
+        <Icon className="size-4" />
+      </span>
+      <span className="min-w-0">
+        <span className="flex items-center gap-1.5 text-sm font-medium">
+          {CATEGORY_LABELS[value] ?? value}
+          {selected && <Check className="size-3.5 text-primary" aria-hidden="true" />}
+        </span>
+        <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+          {CATEGORY_DESCRIPTIONS[value] ?? ""}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function SectionLabel({ children }: { children: string }) {
+  return (
+    <p className="text-xs font-medium tracking-[0.18em] text-muted-foreground uppercase">
+      {children}
+    </p>
+  );
+}
+
 function CategoryPicker({
   selected,
   onSelect,
-  onCancel,
+  onContinue,
 }: {
   selected: string;
   onSelect: (category: string) => void;
-  onCancel: () => void;
+  onContinue: () => void;
 }) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
-        <p className="font-heading text-lg font-semibold tracking-tight">
-          What kind of asset is this?
-        </p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Choosing a category shapes the details you&apos;ll enter next.
+        <SectionLabel>Add asset</SectionLabel>
+        <h2 className="mt-2 font-heading text-2xl font-semibold tracking-tight">
+          What are you adding to your vault?
+        </h2>
+        <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted-foreground">
+          Record your digital assets and keep the details your trusted
+          nominees will need — clear now, findable later. Values you enter are
+          your own estimates.
         </p>
       </div>
 
+      {/* Core categories */}
       <div
         role="radiogroup"
         aria-label="Asset category"
         className="grid gap-3 sm:grid-cols-2"
       >
-        {ASSET_CATEGORIES.map((value) => {
-          const Icon = CATEGORY_ICONS[value] ?? Package;
-          const isSelected = selected === value;
-          return (
-            <button
-              key={value}
-              type="button"
-              role="radio"
-              aria-checked={isSelected}
-              onClick={() => onSelect(value)}
-              className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card ${
-                isSelected
-                  ? "border-primary bg-secondary"
-                  : "bg-card hover:bg-accent/60"
-              }`}
-            >
-              <span
-                className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${
-                  isSelected
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-accent text-accent-foreground"
-                }`}
-              >
-                <Icon className="size-4" />
-              </span>
-              <span className="font-medium">
-                {CATEGORY_LABELS[value] ?? value}
-              </span>
-            </button>
-          );
-        })}
+        {PRIMARY_CATEGORIES.map((value) => (
+          <CategoryTile
+            key={value}
+            value={value}
+            selected={selected === value}
+            onSelect={onSelect}
+          />
+        ))}
       </div>
 
-      <div className="flex items-center justify-end gap-3">
+      {/* Reference accounts — useful to record, not transferable wealth */}
+      <div className="space-y-3">
+        <div>
+          <p className="text-sm font-medium">Important digital accounts</p>
+          <p className="mt-1 max-w-prose text-xs leading-relaxed text-muted-foreground">
+            Social and payment providers often prohibit transferring accounts.
+            Record them so your nominees know they exist — not as wealth you
+            expect to be transferred.
+          </p>
+        </div>
+        <div
+          role="radiogroup"
+          aria-label="Important digital accounts"
+          className="grid gap-3 sm:grid-cols-2"
+        >
+          {REFERENCE_CATEGORIES.map((value) => (
+            <CategoryTile
+              key={value}
+              value={value}
+              selected={selected === value}
+              onSelect={onSelect}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center justify-end gap-3 border-t border-border pt-5">
         <Button type="button" variant="ghost" asChild>
           <Link href="/dashboard">Cancel</Link>
         </Button>
-        <Button type="button" onClick={onCancel} disabled={!selected}>
+        <Button
+          type="button"
+          onClick={onContinue}
+          disabled={!selected}
+          aria-disabled={!selected}
+        >
           Continue
         </Button>
       </div>
@@ -192,6 +287,7 @@ export function AssetForm(props: AssetFormProps) {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saving) return; // guard against accidental duplicate submissions
     setFormError(null);
     setFieldErrors({});
     setSaving(true);
@@ -234,7 +330,12 @@ export function AssetForm(props: AssetFormProps) {
         if (response.status === 400 && data?.fields) {
           setFieldErrors(data.fields);
         }
-        setFormError(data?.error ?? "Something went wrong. Please try again.");
+        setFormError(
+          data?.error ??
+            (response.status >= 500
+              ? "The server could not process this right now. Please try again shortly."
+              : "Something went wrong. Please check the form and try again."),
+        );
         return;
       }
 
@@ -242,7 +343,9 @@ export function AssetForm(props: AssetFormProps) {
       router.push(nextId ? `/dashboard/assets/${nextId}` : "/dashboard");
       router.refresh();
     } catch {
-      setFormError("Something went wrong. Please try again.");
+      setFormError(
+        "Could not reach the server. Check your connection and try again.",
+      );
     } finally {
       setSaving(false);
     }
@@ -251,12 +354,6 @@ export function AssetForm(props: AssetFormProps) {
   if (!isEdit && step === "category") {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>Add asset</CardTitle>
-          <CardDescription>
-            Record a digital asset you own. Values are your own estimates.
-          </CardDescription>
-        </CardHeader>
         <CardContent>
           <CategoryPicker
             selected={category}
@@ -268,7 +365,7 @@ export function AssetForm(props: AssetFormProps) {
                 return next;
               });
             }}
-            onCancel={() => {
+            onContinue={() => {
               if (category) {
                 setStep("details");
               }
@@ -290,85 +387,146 @@ export function AssetForm(props: AssetFormProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} noValidate className="space-y-6">
+        <form onSubmit={handleSubmit} noValidate className="space-y-10">
           {formError && (
             <Alert variant="destructive">
               <AlertDescription>{formError}</AlertDescription>
             </Alert>
           )}
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="asset-title">
-                Asset name <span aria-hidden="true">*</span>
-              </Label>
-              <Input
-                id="asset-title"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder="e.g. Steam Game Library"
-                maxLength={100}
-                required
-                aria-invalid={fieldErrors.title ? true : undefined}
-                aria-describedby={
-                  fieldErrors.title ? "asset-title-error" : undefined
-                }
-              />
-              <FieldError id="asset-title-error" message={fieldErrors.title} />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="asset-provider">
-                Provider or platform <span aria-hidden="true">*</span>
-              </Label>
-              <Input
-                id="asset-provider"
-                value={providerName}
-                onChange={(event) => setProviderName(event.target.value)}
-                placeholder="e.g. Steam, GoDaddy, Zerodha"
-                maxLength={120}
-                required
-                aria-invalid={fieldErrors.providerName ? true : undefined}
-                aria-describedby={
-                  fieldErrors.providerName ? "asset-provider-error" : undefined
-                }
-              />
-              <FieldError
-                id="asset-provider-error"
-                message={fieldErrors.providerName}
-              />
-            </div>
-
-            {/* Category select for edit mode; create mode uses the picker */}
-            <div className={`${isEdit ? "space-y-2" : "hidden"} space-y-2`}>
-              <Label htmlFor="asset-category">
-                Category <span aria-hidden="true">*</span>
-              </Label>
-              <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger
-                  id="asset-category"
-                  aria-invalid={fieldErrors.category ? true : undefined}
-                  aria-describedby={
-                    fieldErrors.category ? "asset-category-error" : undefined
-                  }
+          {/* A. Asset identity */}
+          <section aria-labelledby="section-identity" className="space-y-5">
+            <div className="flex items-end justify-between gap-4 border-b border-border pb-2">
+              <h3
+                id="section-identity"
+                className="font-heading text-base font-semibold tracking-tight"
+              >
+                Asset identity
+              </h3>
+              {!isEdit && category && (
+                <button
+                  type="button"
+                  onClick={() => setStep("category")}
+                  className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
                 >
-                  <SelectValue placeholder="Select a category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ASSET_CATEGORIES.map((value) => (
-                    <SelectItem key={value} value={value}>
-                      {CATEGORY_LABELS[value] ?? value}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FieldError
-                id="asset-category-error"
-                message={fieldErrors.category}
-              />
+                  <ArrowLeft className="size-4" />
+                  Change category
+                </button>
+              )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            {!isEdit && category && (
+              <div className="flex items-center gap-3 rounded-lg border border-border bg-secondary/40 px-4 py-3">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                  {(() => {
+                    const Icon = CATEGORY_ICONS[category] ?? Package;
+                    return <Icon className="size-4" aria-hidden="true" />;
+                  })()}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">
+                    {CATEGORY_LABELS[category] ?? category}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Selected category
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="asset-title">
+                  Asset name <span aria-hidden="true">*</span>
+                </Label>
+                <Input
+                  id="asset-title"
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  placeholder="e.g. Home lab server"
+                  maxLength={100}
+                  required
+                  aria-invalid={fieldErrors.title ? true : undefined}
+                  aria-describedby={
+                    fieldErrors.title ? "asset-title-error" : undefined
+                  }
+                />
+                <FieldError id="asset-title-error" message={fieldErrors.title} />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="asset-provider">
+                  Provider or platform <span aria-hidden="true">*</span>
+                </Label>
+                <Input
+                  id="asset-provider"
+                  value={providerName}
+                  onChange={(event) => setProviderName(event.target.value)}
+                  placeholder="e.g. Steam, GoDaddy, Zerodha"
+                  maxLength={120}
+                  required
+                  aria-invalid={fieldErrors.providerName ? true : undefined}
+                  aria-describedby={
+                    fieldErrors.providerName
+                      ? "asset-provider-error"
+                      : undefined
+                  }
+                />
+                <FieldError
+                  id="asset-provider-error"
+                  message={fieldErrors.providerName}
+                />
+              </div>
+
+              {/* Category select for edit mode; create mode uses the picker */}
+              <div className={`space-y-2 ${!isEdit ? "hidden" : ""}`}>
+                <Label htmlFor="asset-category">
+                  Category <span aria-hidden="true">*</span>
+                </Label>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger
+                    id="asset-category"
+                    aria-invalid={fieldErrors.category ? true : undefined}
+                    aria-describedby={
+                      fieldErrors.category
+                        ? "asset-category-error"
+                        : undefined
+                    }
+                  >
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ASSET_CATEGORIES.map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {CATEGORY_LABELS[value] ?? value}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldError
+                  id="asset-category-error"
+                  message={fieldErrors.category}
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* B. Estimated value */}
+          <section aria-labelledby="section-value" className="space-y-5">
+            <div className="border-b border-border pb-2">
+              <h3
+                id="section-value"
+                className="font-heading text-base font-semibold tracking-tight"
+              >
+                Estimated value
+              </h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Your own estimate, not a live valuation — currencies are kept
+                separate and never combined.
+              </p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="asset-value">
                   Estimated value <span aria-hidden="true">*</span>
@@ -423,120 +581,155 @@ export function AssetForm(props: AssetFormProps) {
                   message={fieldErrors.currency}
                 />
               </div>
-            </div>
 
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="asset-description">Description</Label>
-              <Textarea
-                id="asset-description"
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                placeholder="What this asset is and why you own it"
-                maxLength={2000}
-                rows={3}
-                aria-invalid={fieldErrors.description ? true : undefined}
-                aria-describedby={
-                  fieldErrors.description
-                    ? "asset-description-error"
-                    : "asset-description-help"
-                }
-              />
-              <p id="asset-description-help" className="text-xs text-muted-foreground">
-                Optional.
-              </p>
-              <FieldError
-                id="asset-description-error"
-                message={fieldErrors.description}
-              />
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="asset-valuation-basis">Valuation basis</Label>
+                <Input
+                  id="asset-valuation-basis"
+                  value={valuationBasis}
+                  onChange={(event) => setValuationBasis(event.target.value)}
+                  placeholder="e.g. Recent marketplace listing"
+                  maxLength={300}
+                  aria-invalid={fieldErrors.valuationBasis ? true : undefined}
+                  aria-describedby={
+                    fieldErrors.valuationBasis
+                      ? "asset-valuation-basis-error"
+                      : "asset-valuation-basis-help"
+                  }
+                />
+                <p
+                  id="asset-valuation-basis-help"
+                  className="text-xs text-muted-foreground"
+                >
+                  Optional. How you arrived at the estimate — useful context
+                  for your nominees.
+                </p>
+                <FieldError
+                  id="asset-valuation-basis-error"
+                  message={fieldErrors.valuationBasis}
+                />
+              </div>
             </div>
+          </section>
 
-            <div className="space-y-2">
-              <Label htmlFor="asset-account-ref">Account identifier</Label>
-              <Input
-                id="asset-account-ref"
-                value={accountReference}
-                onChange={(event) => setAccountReference(event.target.value)}
-                placeholder="e.g. @handle or user id"
-                maxLength={200}
-                aria-invalid={fieldErrors.accountReference ? true : undefined}
-                aria-describedby={
-                  fieldErrors.accountReference
-                    ? "asset-account-ref-error"
-                    : "asset-account-ref-help"
-                }
-              />
-              <p
-                id="asset-account-ref-help"
-                className="text-xs text-muted-foreground"
+          {/* C. Helpful details */}
+          <section aria-labelledby="section-details" className="space-y-5">
+            <div className="border-b border-border pb-2">
+              <h3
+                id="section-details"
+                className="font-heading text-base font-semibold tracking-tight"
               >
-                Optional. Never enter passwords, recovery codes or seed phrases.
+                Helpful details
+              </h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Optional context that helps a trusted person identify and
+                verify this asset. Never store passwords or secrets here.
               </p>
-              <FieldError
-                id="asset-account-ref-error"
-                message={fieldErrors.accountReference}
-              />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="asset-valuation-basis">Valuation basis</Label>
-              <Input
-                id="asset-valuation-basis"
-                value={valuationBasis}
-                onChange={(event) => setValuationBasis(event.target.value)}
-                placeholder="e.g. Market listing comparison"
-                maxLength={300}
-                aria-invalid={fieldErrors.valuationBasis ? true : undefined}
-                aria-describedby={
-                  fieldErrors.valuationBasis
-                    ? "asset-valuation-basis-error"
-                    : "asset-valuation-basis-help"
-                }
-              />
-              <p
-                id="asset-valuation-basis-help"
-                className="text-xs text-muted-foreground"
-              >
-                Optional. How you arrived at the estimate.
-              </p>
-              <FieldError
-                id="asset-valuation-basis-error"
-                message={fieldErrors.valuationBasis}
-              />
-            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="asset-description">Description</Label>
+                <Textarea
+                  id="asset-description"
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  placeholder="What this asset is and why you own it"
+                  maxLength={2000}
+                  rows={3}
+                  aria-invalid={fieldErrors.description ? true : undefined}
+                  aria-describedby={
+                    fieldErrors.description
+                      ? "asset-description-error"
+                      : "asset-description-help"
+                  }
+                />
+                <p
+                  id="asset-description-help"
+                  className="text-xs text-muted-foreground"
+                >
+                  Optional.
+                </p>
+                <FieldError
+                  id="asset-description-error"
+                  message={fieldErrors.description}
+                />
+              </div>
 
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="asset-official-url">Official provider URL</Label>
-              <Input
-                id="asset-official-url"
-                type="url"
-                value={officialUrl}
-                onChange={(event) => setOfficialUrl(event.target.value)}
-                placeholder="https://example.com"
-                maxLength={500}
-                aria-invalid={fieldErrors.officialUrl ? true : undefined}
-                aria-describedby={
-                  fieldErrors.officialUrl
-                    ? "asset-official-url-error"
-                    : "asset-official-url-help"
-                }
-              />
-              <p
-                id="asset-official-url-help"
-                className="text-xs text-muted-foreground"
-              >
-                Optional.{" "}
-                {isEdit
-                  ? "Clear the field to remove the link."
-                  : "A link to the provider's official page."}
-              </p>
-              <FieldError
-                id="asset-official-url-error"
-                message={fieldErrors.officialUrl}
-              />
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="asset-account-ref">Account identifier</Label>
+                <Input
+                  id="asset-account-ref"
+                  value={accountReference}
+                  onChange={(event) => setAccountReference(event.target.value)}
+                  placeholder="e.g. @handle or user id"
+                  maxLength={200}
+                  aria-invalid={fieldErrors.accountReference ? true : undefined}
+                  aria-describedby={
+                    fieldErrors.accountReference
+                      ? "asset-account-ref-error"
+                      : "asset-account-ref-help"
+                  }
+                />
+                <p
+                  id="asset-account-ref-help"
+                  className="text-xs text-muted-foreground"
+                >
+                  Optional. Never enter passwords, recovery codes or seed
+                  phrases.
+                </p>
+                <FieldError
+                  id="asset-account-ref-error"
+                  message={fieldErrors.accountReference}
+                />
+              </div>
 
-            {isEdit && (
-              <>
+              <div className="space-y-2">
+                <Label htmlFor="asset-official-url">Official provider URL</Label>
+                <Input
+                  id="asset-official-url"
+                  type="url"
+                  value={officialUrl}
+                  onChange={(event) => setOfficialUrl(event.target.value)}
+                  placeholder="https://example.com"
+                  maxLength={500}
+                  aria-invalid={fieldErrors.officialUrl ? true : undefined}
+                  aria-describedby={
+                    fieldErrors.officialUrl
+                      ? "asset-official-url-error"
+                      : "asset-official-url-help"
+                  }
+                />
+                <p
+                  id="asset-official-url-help"
+                  className="text-xs text-muted-foreground"
+                >
+                  Optional.{" "}
+                  {isEdit
+                    ? "Clear the field to remove the link."
+                    : "A link to the provider's official page."}
+                </p>
+                <FieldError
+                  id="asset-official-url-error"
+                  message={fieldErrors.officialUrl}
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Edit-only: status and nominee visibility */}
+          {isEdit && (
+            <section aria-labelledby="section-status" className="space-y-5">
+              <div className="border-b border-border pb-2">
+                <h3
+                  id="section-status"
+                  className="font-heading text-base font-semibold tracking-tight"
+                >
+                  Status &amp; nominee visibility
+                </h3>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="asset-status">Status</Label>
                   <Select value={status} onValueChange={setStatus}>
@@ -587,11 +780,11 @@ export function AssetForm(props: AssetFormProps) {
                     and the asset title.
                   </p>
                 </div>
-              </>
-            )}
-          </div>
+              </div>
+            </section>
+          )}
 
-          <div className="flex items-center justify-end gap-3">
+          <div className="flex items-center justify-end gap-3 border-t border-border pt-5">
             {!isEdit && (
               <button
                 type="button"
@@ -599,7 +792,7 @@ export function AssetForm(props: AssetFormProps) {
                 className="mr-auto inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
               >
                 <ArrowLeft className="size-4" />
-                Change category
+                Back to categories
               </button>
             )}
             <Button type="button" variant="ghost" asChild>
@@ -621,5 +814,3 @@ export function AssetForm(props: AssetFormProps) {
     </Card>
   );
 }
-
-

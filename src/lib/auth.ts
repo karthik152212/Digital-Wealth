@@ -85,6 +85,21 @@ export const auth = betterAuth({
         },
       }
     : undefined,
+  user: {
+    // Expose the existing lastSeenAt column through Better Auth's session
+    // user object. Without this declaration the dashboard can never see a
+    // fresh check-in: the column exists in the DB but is omitted from the
+    // projected session user, so "Keep it active" always showed "Never
+    // checked in" even right after a confirmed, persisted check-in.
+    // input: false — no client endpoint can set it; only the server-side
+    // /api/check-in route writes it.
+    additionalFields: {
+      lastSeenAt: {
+        type: "date",
+        input: false,
+      },
+    },
+  },
   session: {
     expiresIn: 60 * 60 * 24 * 7,
     updateAge: 60 * 60 * 24,

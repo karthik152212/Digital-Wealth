@@ -17,17 +17,18 @@ export const ASSET_CATEGORIES = [
 
 export type AssetCategoryValue = (typeof ASSET_CATEGORIES)[number];
 
+// Display-only labels (the API/DB enum values are unchanged).
 export const CATEGORY_LABELS: Record<string, string> = {
-  CRYPTO: "Crypto",
-  DOMAIN: "Domains",
-  CLOUD_STORAGE: "Cloud Storage",
-  INVESTMENT: "Investments",
-  GAMING: "Gaming",
-  DIGITAL_CONTENT: "Digital Content",
-  SOCIAL_MEDIA: "Social Media",
-  PAYMENT_ACCOUNT: "Payment Accounts",
-  SOFTWARE_LICENSE: "Software Licenses",
-  OTHER: "Other",
+  CRYPTO: "Cryptocurrency & tokens",
+  INVESTMENT: "Stocks & investments",
+  DOMAIN: "Domains & websites",
+  GAMING: "Gaming assets",
+  DIGITAL_CONTENT: "Collectibles & content",
+  CLOUD_STORAGE: "Cloud & data storage",
+  SOFTWARE_LICENSE: "Software & licences",
+  OTHER: "Other digital assets",
+  SOCIAL_MEDIA: "Social media accounts",
+  PAYMENT_ACCOUNT: "Payment accounts",
 };
 
 export function categoryLabel(category: string): string {

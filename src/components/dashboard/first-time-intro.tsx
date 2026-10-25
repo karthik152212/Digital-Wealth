@@ -1,36 +1,58 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import { Compass, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
 const INTRO_STORAGE_KEY = "dwv-intro-dismissed";
 
+const listeners = new Set<() => void>();
+
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function getSnapshot(): boolean {
+  try {
+    return window.localStorage.getItem(INTRO_STORAGE_KEY) !== "1";
+  } catch {
+    // Storage unavailable (private mode) — show the intro dismissibly for
+    // the current page view.
+    return true;
+  }
+}
+
+// SSR and hydration never show the intro; the client snapshot takes over
+// immediately after hydration.
+function getServerSnapshot(): boolean {
+  return false;
+}
+
+function emitChange(): void {
+  for (const listener of listeners) listener();
+}
+
 export function FirstTimeIntro() {
-  const [visible, setVisible] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const visible = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot,
+  );
 
-  useEffect(() => {
-    setMounted(true);
-    try {
-      setVisible(window.localStorage.getItem(INTRO_STORAGE_KEY) !== "1");
-    } catch {
-      setVisible(true);
-    }
-  }, []);
-
-  function dismiss() {
-    setVisible(false);
+  const dismiss = useCallback(() => {
     try {
       window.localStorage.setItem(INTRO_STORAGE_KEY, "1");
     } catch {
-      // Storage unavailable (private mode) — the intro just stays dismissible
-      // for the current page view.
+      // Storage unavailable — dismiss only for the current page view.
     }
-  }
+    emitChange();
+  }, []);
 
-  if (!mounted || !visible) return null;
+  if (!visible) return null;
 
   return (
     <aside

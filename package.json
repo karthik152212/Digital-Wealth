@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test --test-concurrency=1 tests/asset-schemas.test.ts tests/asset-api.test.ts tests/nominee-schemas.test.ts tests/nominee-api.test.ts tests/inheritance-schemas.test.ts tests/inheritance-api.test.ts tests/invite-asset-dialog.test.ts tests/email-verification.test.ts",
+    "test": "node --import tsx --test --test-concurrency=1 tests/asset-schemas.test.ts tests/asset-api.test.ts tests/nominee-schemas.test.ts tests/nominee-api.test.ts tests/inheritance-schemas.test.ts tests/inheritance-api.test.ts tests/invite-asset-dialog.test.ts tests/email-verification.test.ts tests/check-in-api.test.ts",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
