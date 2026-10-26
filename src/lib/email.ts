@@ -3,8 +3,9 @@
  *
  * Delivery strategy (smallest maintainable option for this prototype):
  *
- *  - Provider mode: when RESEND_API_KEY and EMAIL_FROM are set, emails are
- *    sent through the Resend HTTP API using fetch — no extra dependency.
+ *  - Provider mode: when BREVO_API_KEY (or, during the migration window, the
+ *    legacy RESEND_API_KEY) and EMAIL_FROM are set, emails are sent through
+ *    Brevo's transactional HTTP API using fetch — no extra dependency.
  *  - Dev-console mode: when no provider is configured (the current state of
  *    this environment), the verification link is printed to the `next dev`
  *    server console so the flow can be completed locally. This fallback is
@@ -16,8 +17,41 @@
  * untrusted Host header of an incoming request.
  */
 
-const RESEND_API_URL = "https://api.resend.com/emails";
+const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 const VERIFICATION_LINK_TTL_HOURS = 24;
+
+/**
+ * API key for the provider. `BREVO_API_KEY` is the primary name; the legacy
+ * `RESEND_API_KEY` is still present in Vercel and is honoured as a fallback
+ * so a rollback during the migration window needs no code change. Remove the
+ * fallback only after the Brevo cutover has been verified.
+ */
+function providerApiKey(): string | undefined {
+  return (
+    process.env.BREVO_API_KEY?.trim() || process.env.RESEND_API_KEY?.trim()
+  );
+}
+
+/**
+ * Parse EMAIL_FROM into Brevo's required `{ email, name }` sender object.
+ * Accepts `Name <address@domain>` or a bare `address@domain`.
+ *
+ * Throws a configuration error without ever echoing the raw value, because
+ * the caller may surface the message.
+ */
+function parseSender(from: string): { email: string; name?: string } {
+  const bracketed = /^(.*)<\s*([^<>\s]+@[^<>\s]+)\s*>$/.exec(from);
+  if (bracketed) {
+    const name = bracketed[1].trim().replace(/^"|"$/g, "");
+    return name ? { email: bracketed[2], name } : { email: bracketed[2] };
+  }
+  if (/^[^<>\s]+@[^<>\s]+$/.test(from)) {
+    return { email: from };
+  }
+  throw new Error(
+    "EMAIL_FROM is not a valid sender (expected \"Name <address@domain>\" or an address).",
+  );
+}
 
 export type VerificationEmailInput = {
   user: { name: string; email: string };
@@ -80,32 +114,42 @@ function renderEmail(user: { name: string; email: string }, link: string) {
 export async function deliverVerificationEmail(
   input: VerificationEmailInput,
 ): Promise<VerificationEmailResult> {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const apiKey = providerApiKey();
   const from = process.env.EMAIL_FROM?.trim();
 
   if (apiKey && from) {
+    const sender = parseSender(from);
     const link = buildVerificationLink(input.token);
     const { subject, text, html } = renderEmail(input.user, link);
     let response: Response;
     try {
-      response = await fetch(RESEND_API_URL, {
+      response = await fetch(BREVO_API_URL, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          // Brevo authenticates with a dedicated header, not Authorization.
+          "api-key": apiKey,
           "Content-Type": "application/json",
+          Accept: "application/json",
         },
         body: JSON.stringify({
-          from,
-          to: [input.user.email],
+          sender,
+          to: [
+            {
+              email: input.user.email,
+              name: input.user.name || undefined,
+            },
+          ],
           subject,
-          text,
-          html,
+          textContent: text,
+          htmlContent: html,
         }),
       });
     } catch {
       // No token, no credentials in the error.
       throw new Error("Email provider request failed.");
     }
+    // Brevo answers 201 with a messageId on success; any non-2xx is a
+    // rejection (invalid/unverified sender, exhausted credits, bad key).
     if (!response.ok) {
       throw new Error(`Email provider rejected the message (${response.status}).`);
     }
@@ -116,7 +160,7 @@ export async function deliverVerificationEmail(
     // Fail loudly instead of silently dropping verification mail.
     // (No token or secret is included in this message.)
     throw new Error(
-      "Email delivery is not configured. Set RESEND_API_KEY and EMAIL_FROM.",
+      "Email delivery is not configured. Set BREVO_API_KEY and EMAIL_FROM.",
     );
   }
 
@@ -131,7 +175,7 @@ export async function deliverVerificationEmail(
       `  To:      ${input.user.email}`,
       `  Link:    ${link}`,
       `  Expires: ${VERIFICATION_LINK_TTL_HOURS}h`,
-      "  Configure RESEND_API_KEY + EMAIL_FROM for real delivery.",
+      "  Configure BREVO_API_KEY + EMAIL_FROM for real delivery.",
       "──────────────────────────────────────────────────────────",
       "",
     ].join("\n"),
