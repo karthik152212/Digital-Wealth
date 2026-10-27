@@ -17,6 +17,7 @@ import {
   Inbox,
   Key,
   Loader2,
+  MessageSquare,
   Package,
   Plus,
   Sparkles,
@@ -25,7 +26,7 @@ import {
   AtSign,
 } from "lucide-react";
 
-import { getDashboardAssets } from "@/lib/assets";
+import { getPortfolioSnapshot, STALE_AFTER_DAYS } from "@/lib/portfolio";
 import { categoryLabel } from "@/lib/asset-schemas";
 import { formatMoney } from "@/lib/currency";
 import { listMyNotifications, isNomineeSomewhere } from "@/lib/notifications";
@@ -42,6 +43,8 @@ import { SignOutButton } from "@/components/auth/sign-out-button";
 import { CheckInButton } from "@/components/dashboard/check-in-button";
 import { AssetTableSkeleton } from "@/components/dashboard/asset-table-skeleton";
 import { FirstTimeIntro } from "@/components/dashboard/first-time-intro";
+import { AiInsightsPanel } from "@/components/dashboard/ai-insights-panel";
+import { PortfolioDistribution } from "@/components/dashboard/portfolio-distribution";
 
 export const instant = false;
 
@@ -77,7 +80,19 @@ async function DashboardContent() {
     redirect("/login");
   }
 
-  const { assets, totals } = await getDashboardAssets(session.user.id);
+  const snapshot = await getPortfolioSnapshot(session.user.id);
+  const assets = snapshot.assets;
+  const totals = {
+    byCurrency: snapshot.totalsByCurrency,
+    byCategory: snapshot.categories,
+    assetCount: snapshot.assetCount,
+  };
+  const valuationStatus = {
+    current:
+      snapshot.assetCount - snapshot.health.staleCount - snapshot.health.missingDateCount,
+    stale: snapshot.health.staleCount,
+    undated: snapshot.health.missingDateCount,
+  };
   const [inNotifications, isNominee] = await Promise.all([
     listMyNotifications(session.user.id),
     isNomineeSomewhere(session.user.email),
@@ -121,6 +136,12 @@ async function DashboardContent() {
               </Link>
             </Button>
           )}
+          <Button asChild variant="outline" size="sm">
+            <Link href="/dashboard/chat">
+              <MessageSquare className="size-4" />
+              Ask the AI vault
+            </Link>
+          </Button>
           <Button asChild variant="outline" size="sm">
             <Link href="/dashboard/nominees">
               <Users className="size-4" />
@@ -182,10 +203,58 @@ async function DashboardContent() {
                 )}
               </div>
             </div>
-            <p className="mt-4 text-xs text-muted-foreground">
-              Fictional estimates tracked per currency — currencies are never
-              mixed into one total.
-            </p>
+            <div className="mt-4 space-y-2">
+              {snapshot.assetCount > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground">
+                    Valuation status:
+                  </span>
+                  {valuationStatus.current > 0 && (
+                    <Badge variant="outline">
+                      {valuationStatus.current} current (within {STALE_AFTER_DAYS} days)
+                    </Badge>
+                  )}
+                  {valuationStatus.stale > 0 && (
+                    <Badge variant="secondary">
+                      {valuationStatus.stale} stale ({STALE_AFTER_DAYS}+ days)
+                    </Badge>
+                  )}
+                  {valuationStatus.undated > 0 && (
+                    <Badge variant="secondary">
+                      {valuationStatus.undated} without a date
+                    </Badge>
+                  )}
+                </div>
+              )}
+              {snapshot.history.length > 0 ? (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Recorded valuation history
+                  </p>
+                  {snapshot.history.map((entry) => (
+                    <p key={entry.currency} className="text-xs text-muted-foreground">
+                      {entry.currency}: {formatMoney(entry.earliest.value, entry.currency)}{" "}
+                      on {new Date(entry.earliest.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}{" "}
+                      → {formatMoney(entry.latest.value, entry.currency)} on{" "}
+                      {new Date(entry.latest.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}{" "}
+                      ({entry.delta >= 0 ? "+" : ""}
+                      {formatMoney(entry.delta, entry.currency)}) across{" "}
+                      {entry.assetsWithHistory} of {entry.assetsTotal} assets
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  No valuation history recorded yet — a change will appear here
+                  once an asset has two or more recorded valuations.
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Saved valuations, not live prices: no market-data provider is
+                connected, so nothing here refreshes automatically. Currencies
+                are never mixed into one total.
+              </p>
+            </div>
           </CardContent>
         </Card>
 
@@ -216,6 +285,8 @@ async function DashboardContent() {
         </Card>
       </div>
 
+      <AiInsightsPanel />
+
       {/* Category breakdown */}
       <section aria-label="Category breakdown">
         <div className="mb-3 flex items-end justify-between">
@@ -235,7 +306,14 @@ async function DashboardContent() {
             appear here.
           </p>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <>
+            <div className="mb-5 rounded-xl border bg-card p-4">
+              <PortfolioDistribution
+                categories={totals.byCategory}
+                totalsByCurrency={totals.byCurrency}
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {totals.byCategory.map((item) => {
               const Icon = CATEGORY_ICONS[item.category] ?? Package;
               return (
@@ -269,7 +347,8 @@ async function DashboardContent() {
                 </div>
               );
             })}
-          </div>
+            </div>
+          </>
         )}
       </section>
 
@@ -313,8 +392,11 @@ async function DashboardContent() {
                       Provider
                     </th>
                     <th className="pb-3 pr-4 pt-4 font-medium">Status</th>
+                    <th className="hidden pb-3 pr-4 pt-4 font-medium md:table-cell">
+                      Valuation
+                    </th>
                     <th className="px-4 pb-3 pl-0 pr-4 pt-4 text-right font-medium">
-                      Est. value
+                      Saved value
                     </th>
                   </tr>
                 </thead>
@@ -356,8 +438,36 @@ async function DashboardContent() {
                           {asset.status === "ACTIVE" ? "Active" : "Archived"}
                         </Badge>
                       </td>
+                      <td className="hidden py-3 pr-4 md:table-cell">
+                        <div className="text-sm">
+                          {asset.valuationDate ? (
+                            new Date(asset.valuationDate).toLocaleDateString("en-GB", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })
+                          ) : (
+                            <span className="text-muted-foreground">No date</span>
+                          )}
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          <Badge variant="outline" className="text-[10px] font-normal">
+                            Manual entry
+                          </Badge>
+                          {asset.freshness === "STALE" && (
+                            <Badge variant="secondary" className="text-[10px] font-normal">
+                              Stale
+                            </Badge>
+                          )}
+                          {asset.freshness === "UNKNOWN_DATE" && (
+                            <Badge variant="secondary" className="text-[10px] font-normal">
+                              No date
+                            </Badge>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-right font-medium">
-                        {formatMoney(asset.estimatedValue, asset.currency)}
+                        {formatMoney(asset.savedValue, asset.currency)}
                       </td>
                     </tr>
                   ))}

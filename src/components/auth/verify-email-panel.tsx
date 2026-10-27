@@ -168,20 +168,10 @@ export function VerifyEmailPanel() {
             <Link href="/login">Continue to sign in</Link>
           </Button>
         ) : (
-          canResend && (
-            <ResendVerificationButton
-              email={emailParam!}
-              onResult={handleResend}
-              className="w-full"
-            />
-          )
+          <p className="text-center text-sm text-muted-foreground">
+            Email verification is not available with the current sign-in method.
+          </p>
         )}
-
-        <p className="text-center text-sm text-muted-foreground">
-          <Link href="/login" className="text-primary hover:underline">
-            Back to sign in
-          </Link>
-        </p>
       </CardContent>
     </Card>
   );

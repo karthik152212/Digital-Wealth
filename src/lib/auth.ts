@@ -26,32 +26,13 @@ export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL,
   database: prismaAdapter(prisma, { provider: "postgresql" }),
   emailAndPassword: {
-    enabled: true,
+    enabled: false,
     minPasswordLength: 8,
-    // Blocks sign-in for unverified accounts (Better Auth returns
-    // EMAIL_NOT_VERIFIED) and makes duplicate sign-ups return a generic
-    // response so registration cannot be used to enumerate accounts.
-    // Note: with this enabled, Better Auth skips auto-sign-in after
-    // sign-up — the UI routes new users to the verification flow instead.
-    requireEmailVerification: true,
   },
   emailVerification: {
-    // requireEmailVerification already implies sendOnSignUp; set explicitly
-    // so the behavior is visible in this config.
-    sendOnSignUp: true,
-    // Verification links are stateless, signed JWTs (HS256 with
-    // BETTER_AUTH_SECRET). 24h is a deliberate prototype-friendly expiry.
+    sendOnSignUp: false,
     expiresIn: 60 * 60 * 24,
-    // Every send (sign-up and Better Auth's built-in resend endpoint) claims
-    // the shared per-email cooldown first. On conflict the send is skipped
-    // silently so sign-up can never fail and no path can flood an inbox.
-    // The UI's /api/auth/resend-verification endpoint performs the same
-    // claim up front and surfaces an honest 429 + Retry-After instead.
-    sendVerificationEmail: async ({ user, token }) => {
-      const claim = await claimResendCooldown(user.email);
-      if (!claim.claimed) return;
-      await deliverVerificationEmail({ user, token });
-    },
+    sendVerificationEmail: async () => {},
   },
   rateLimit: {
     // Enabled in every environment (default is production-only).

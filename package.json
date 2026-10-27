@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test --test-concurrency=1 tests/asset-schemas.test.ts tests/asset-api.test.ts tests/nominee-schemas.test.ts tests/nominee-api.test.ts tests/inheritance-schemas.test.ts tests/inheritance-api.test.ts tests/invite-asset-dialog.test.ts tests/email-verification.test.ts tests/check-in-api.test.ts",
+    "test": "node --import tsx --test --test-concurrency=1 tests/asset-schemas.test.ts tests/portfolio.test.ts tests/ai-context.test.ts tests/ai-insights.test.ts tests/ai-provider.test.ts tests/asset-api.test.ts tests/nominee-schemas.test.ts tests/nominee-api.test.ts tests/inheritance-schemas.test.ts tests/inheritance-api.test.ts tests/invite-asset-dialog.test.ts tests/email-verification.test.ts tests/check-in-api.test.ts tests/ai-api.test.ts",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
@@ -18,6 +18,7 @@
     "db:reset": "prisma migrate reset"
   },
   "dependencies": {
+    "@google/genai": "^2.31.0",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
     "better-auth": "^1.7.12",
